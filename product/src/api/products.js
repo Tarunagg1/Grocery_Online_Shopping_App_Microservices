@@ -1,12 +1,11 @@
+const { CUSTOMER_BINDING_KEY, SHOPPING_BINDING_KEY } = require('../config');
 const ProductService = require('../services/product-service');
-const { PublishCustomeEvent, PublishShoppingEvent } = require('../utils/index');
+const { PublishMessage } = require('../utils/index');
 const UserAuth = require('./middlewares/auth')
 
-module.exports = (app) => {
+module.exports = (app, channel) => {
 
     const service = new ProductService();
-    const customerService = new CustomerService();
-
 
     app.post('/product/create', async (req, res, next) => {
 
@@ -15,7 +14,6 @@ module.exports = (app) => {
             // validation
             const { data } = await service.CreateProduct({ name, desc, type, unit, price, available, suplier, banner });
             return res.json(data);
-
         } catch (err) {
             next(err)
         }
@@ -68,11 +66,11 @@ module.exports = (app) => {
         const { _id } = req.user;
         // get the payload  which send to customer service
         const { data } = await service.GetProductPayload(_id, { productId: req.body._id }, "ADD_TO_WISHLIST");
-
         try {
-            PublishCustomeEvent(data);
+            // PublishCustomeEvent(data);
             // const product = await service.GetProductById(req.body._id);
             // const wishList = await customerService.AddToWishlist(_id, product)
+            PublishMessage(channel, CUSTOMER_BINDING_KEY, JSON.stringify(data))
             return res.status(200).json(data.data);
         } catch (err) {
 
@@ -84,10 +82,14 @@ module.exports = (app) => {
         const { _id } = req.user;
         const productId = req.params.id;
 
+
         try {
-            const product = await service.GetProductById(productId);
-            const wishlist = await customerService.AddToWishlist(_id, product)
-            return res.status(200).json(wishlist);
+            const { data } = await service.GetProductPayload(_id, { productId }, "REMOVE_FROM_WISHLIST");
+            // const product = await service.GetProductById(productId);
+            // const wishlist = await customerService.AddToWishlist(_id, product);
+            // PublishCustomeEvent(data);
+            PublishMessage(channel, CUSTOMER_BINDING_KEY, JSON.stringify(data))
+            return res.status(200).json(data);
         } catch (err) {
             next(err)
         }
@@ -96,15 +98,22 @@ module.exports = (app) => {
 
     app.put('/cart', UserAuth, async (req, res, next) => {
 
-        const { _id, qty } = req.body;
-
+        const { _id } = req.user;
         try {
-            const product = await service.GetProductById(_id);
+            // const product = await service.GetProductById(_id);
+            // const result = await customerService.ManageCart(req.user._id, product, qty, false);
+            const { data } = await service.GetProductPayload(_id, { productId: req.body._id, qty: req.body.qty }, "ADD_TO_CART");
+            // PublishCustomeEvent(data);
+            PublishMessage(channel, CUSTOMER_BINDING_KEY, JSON.stringify(data));
 
-            const result = await customerService.ManageCart(req.user._id, product, qty, false);
+            PublishMessage(channel, SHOPPING_BINDING_KEY, JSON.stringify(data));
 
-            return res.status(200).json(result);
 
+            const reponse = {
+                product: data.data.product,
+                unit: data.data.qty
+            }
+            return res.status(200).json(reponse);
         } catch (err) {
             next(err)
         }
@@ -113,11 +122,24 @@ module.exports = (app) => {
     app.delete('/cart/:id', UserAuth, async (req, res, next) => {
 
         const { _id } = req.user;
+        const productId = req.params.id;
 
         try {
-            const product = await service.GetProductById(req.params.id);
-            const result = await customerService.ManageCart(_id, product, 0, true);
-            return res.status(200).json(result);
+            // const product = await service.GetProductById(req.params.id);
+            // const result = await customerService.ManageCart(_id, product, 0, true);
+            const { data } = await service.GetProductPayload(_id, { productId }, "REMOVE_FROM_CART");
+
+            // PublishCustomeEvent(data);
+            PublishMessage(channel, CUSTOMER_BINDING_KEY, JSON.stringify(data));
+
+            PublishMessage(channel, SHOPPING_BINDING_KEY, JSON.stringify(data));
+
+            const reponse = {
+                product: data.data.product,
+                unit: data.data.qty
+            }
+
+            return res.status(200).json(reponse);
         } catch (err) {
             next(err)
         }
@@ -132,7 +154,6 @@ module.exports = (app) => {
         } catch (error) {
             next(err)
         }
-
     });
 
 }

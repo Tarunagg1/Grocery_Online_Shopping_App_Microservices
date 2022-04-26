@@ -1,8 +1,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const axios = require('axios');
+const amqp = require('amqplib')
 
-const { APP_SECRET } = require('../config');
+const { APP_SECRET, MESSAGE_QUEUE_URL, EXCHANGE_NAME } = require('../config');
 
 //Utility functions
 module.exports.GenerateSalt = async () => {
@@ -46,12 +46,46 @@ module.exports.FormateData = (data) => {
 }
 
 
-module.exports.PublishCustomeEvent = async (payload) => {
-        axios.post(`${process.env.CUSTOMER_SERVICE}/customer/app-event`, { payload });
+// module.exports.PublishCustomeEvent = async (payload) => {
+//         axios.post(`${process.env.CUSTOMER_SERVICE}/customer/app-event`, { payload });
+// }
+
+// module.exports.PublishShoppingEvent = async (payload) => {
+//         axios.post(`${process.env.CUSTOMER_SERVICE}/shopping/app-event`, { payload });
+// }
+
+// message broker
+
+module.exports.createChannel = async () => {
+        try {
+                const amqpServer = MESSAGE_QUEUE_URL;
+                const connection = await amqp.connect(amqpServer)
+                const channel = await connection.createChannel();
+                await channel.assertExchange(EXCHANGE_NAME, 'direct', false);
+                return channel;
+        } catch (error) {
+                throw error;
+        }
 }
 
-module.exports.PublishShoppingEvent = async (payload) => {
-        axios.post(`${process.env.CUSTOMER_SERVICE}/shopping/app-event`, { payload });
+module.exports.PublishMessage = async (channel, binding_key, message) => {
+        try {
+                await channel.publish(EXCHANGE_NAME, binding_key, Buffer.from(message));
+        } catch (error) {
+                throw error;
+        }
+}
+
+
+module.exports.SubscribeMessage = async (channel, service, binding_key) => {
+        const appQueue = await channel.assertQueue('QUEUE_NAME');
+
+        channel.bindQueue(appQueue.queue, EXCHANGE_NAME, binding_key);
+        channel.consume(appQueue.queue, data => {
+                console.log('received message');
+                console.log(data.context.toString());
+                channel.ack(data);
+        })
 }
 
 

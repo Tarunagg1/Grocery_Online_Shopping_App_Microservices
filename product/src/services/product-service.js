@@ -4,7 +4,6 @@ const { APIError } = require('../utils/app-errors');
 
 // All Business logic will be here
 class ProductService {
-
     constructor() {
         this.repository = new ProductRepository();
     }

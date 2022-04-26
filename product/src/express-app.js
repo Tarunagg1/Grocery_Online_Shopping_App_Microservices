@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const { products,appEvents } = require('./api');
+const { products,apiEvents } = require('./api');
 const HandleErrors = require('./utils/error-handler')
 
 
-module.exports = async (app) => {
+module.exports = async (app,channel) => {
 
     app.use(express.json({ limit: '1mb' }));
     app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -12,8 +12,8 @@ module.exports = async (app) => {
     app.use(express.static(__dirname + '/public'))
 
     //api
-    products(app);
-    appEvents(app);
+    products(app,channel);
+    apiEvents(app);
 
 
     // error handling
